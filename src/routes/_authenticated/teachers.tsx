@@ -5,7 +5,17 @@ import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserCog, Info } from "lucide-react";
+import { UserCog, Info, Plus } from "lucide-react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { initializeApp, deleteApp } from "firebase/app";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc, addDoc } from "firebase/firestore";
+import { firebaseConfig } from "@/lib/firebase";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/teachers")({
   ssr: false,
@@ -62,24 +72,76 @@ function TeachersPage() {
     },
   });
 
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+
+  const createTeacher = useMutation({
+    mutationFn: async () => {
+      // Use secondary app to prevent logging out the admin
+      const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+      const secondaryAuth = getAuth(secondaryApp);
+      
+      try {
+        const { user } = await createUserWithEmailAndPassword(secondaryAuth, form.email, form.password);
+        await setDoc(doc(db, "profiles", user.uid), {
+          id: user.uid,
+          full_name: form.name,
+        });
+        await addDoc(collection(db, "user_roles"), {
+          user_id: user.uid,
+          role: "teacher"
+        });
+      } finally {
+        await secondaryAuth.signOut();
+        await deleteApp(secondaryApp);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["teachers-overview"] });
+      setOpen(false);
+      setForm({ name: "", email: "", password: "" });
+      toast.success("Teacher account created!");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-3xl font-semibold">Teachers & admins</h1>
-        <p className="text-muted-foreground">Everyone who has access to Attendly.</p>
-      </header>
-
-      <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="flex items-start gap-3 py-4 text-sm">
-          <Info className="mt-0.5 h-4 w-4 text-primary" />
-          <div>
-            <div className="font-medium">Adding a teacher</div>
-            <div className="text-muted-foreground">
-              Ask the teacher to sign up at <span className="font-mono">/auth</span> using the "Sign up" tab. Since an admin already exists, new sign-ups automatically become teachers. Then assign them to specific classes from the <span className="font-medium">Classes</span> page.
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl font-semibold">Teachers & admins</h1>
+          <p className="text-muted-foreground">Everyone who has access to Attendly.</p>
+        </div>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button><Plus className="mr-2 h-4 w-4" /> Add teacher</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Create teacher account</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Full name</Label>
+                <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label>Email</Label>
+                <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label>Password</Label>
+                <Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+                <p className="text-xs text-muted-foreground mt-1">They can log in with this password.</p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+            <DialogFooter>
+              <Button onClick={() => createTeacher.mutate()} disabled={!form.email || !form.password || createTeacher.isPending}>
+                Create account
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </header>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
