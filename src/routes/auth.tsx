@@ -64,6 +64,14 @@ function AuthPage() {
           user_id: user.uid,
           role: "admin"
         });
+      } else {
+        const myRoleSnap = await getDocs(query(collection(db, "user_roles"), where("user_id", "==", user.uid)));
+        if (myRoleSnap.empty) {
+          await addDoc(collection(db, "user_roles"), {
+            user_id: user.uid,
+            role: "teacher"
+          });
+        }
       }
 
       toast.success("Welcome back!");
@@ -94,6 +102,11 @@ function AuthPage() {
         await addDoc(collection(db, "user_roles"), {
           user_id: user.uid,
           role: "admin"
+        });
+      } else {
+        await addDoc(collection(db, "user_roles"), {
+          user_id: user.uid,
+          role: "teacher"
         });
       }
 
