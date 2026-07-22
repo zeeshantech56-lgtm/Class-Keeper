@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Top Triangle with a small inner notch -->
+  <polygon points="50,15 35,45 65,45" fill="#025654" />
+  
+  <!-- Left Triangle -->
+  <polygon points="20,85 35,55 50,85" fill="#025654" />
+  
+  <!-- Right Triangle -->
+  <polygon points="80,85 65,55 50,85" fill="#025654" />
+  
+  <!-- Center Inverted Triangle -->
+  <polygon points="38,50 62,50 50,75" fill="#025654" />
+</svg>

@@ -143,7 +143,7 @@ function AuthPage() {
       <div className="mx-auto grid min-h-screen max-w-6xl grid-cols-1 md:grid-cols-2">
         <div className="hidden flex-col justify-between bg-primary p-10 text-primary-foreground md:flex">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Attendly Logo" className="h-9 w-9 object-contain" />
+            <img src="/logo.svg" alt="Attendly Logo" className="h-9 w-9 object-contain" />
             <span className="font-display text-xl font-semibold">Attendly</span>
           </div>
           <div>

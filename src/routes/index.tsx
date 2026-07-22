@@ -23,7 +23,7 @@ function Landing() {
     <div className="min-h-screen bg-background">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Attendly Logo" className="h-9 w-9 object-contain" />
+          <img src="/logo.svg" alt="Attendly Logo" className="h-9 w-9 object-contain" />
           <span className="font-display text-xl font-semibold">Attendly</span>
         </div>
         <Link to="/auth"><Button variant="outline">Sign in</Button></Link>
