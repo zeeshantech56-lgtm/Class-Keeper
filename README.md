@@ -1,29 +1,34 @@
-# Welcome to your Lovable project
+# Class Keeper
 
-This project was built with [Lovable](https://lovable.dev).
+A modern, fast, and simple class management and attendance tracking web application.
 
-## Build with Lovable
+## Features
+- **Authentication**: Secure sign-in for Admins and Teachers (powered by Firebase).
+- **Class Management**: Admins can create classes and add multiple batches.
+- **Teacher Assignment**: Assign specific teachers to classes and batches.
+- **Student Records**: Maintain detailed records of students and their guardians.
+- **Attendance**: Effortless daily attendance tracking with one-click toggles.
+- **Reports**: Generate historical attendance reports for individuals or entire classes.
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+## Tech Stack
+- React 19
+- Vite & TanStack Router
+- TailwindCSS & shadcn/ui components
+- Firebase (Authentication & Cloud Firestore)
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+## Getting Started
 
-## Development
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+2. Run the development server:
+   ```bash
+   npm run dev
+   ```
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
-
-## Built with
-
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+3. Build for production:
+   ```bash
+   npm run build
+   ```
