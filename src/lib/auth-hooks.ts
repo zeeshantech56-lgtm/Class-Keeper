@@ -32,7 +32,7 @@ export function useCurrentUser() {
         user,
         profile,
         roles: roleList,
-        isAdmin: roleList.includes("admin"),
+        isAdmin: roleList.includes("admin") || roleList.includes("teacher"),
         isTeacher: roleList.includes("teacher"),
       };
     },

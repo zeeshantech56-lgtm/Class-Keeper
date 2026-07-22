@@ -30,8 +30,8 @@ export const Route = createFileRoute("/_authenticated/teachers")({
     
     const rolesSnap = await getDocs(query(collection(db, "user_roles"), where("user_id", "==", user.uid)));
     const roles = rolesSnap.docs.map(d => d.data());
-    const isAdmin = roles.some((r) => r.role === "admin");
-    if (!isAdmin) throw redirect({ to: "/dashboard" });
+    const hasAccess = roles.some((r) => r.role === "admin" || r.role === "teacher");
+    if (!hasAccess) throw redirect({ to: "/dashboard" });
   },
   head: () => ({
     meta: [
