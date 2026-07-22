@@ -2,7 +2,8 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Users, BarChart3, Calendar, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Users, BarChart3, Calendar, ShieldCheck, Download } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -19,6 +20,27 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      setDeferredPrompt(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
@@ -44,7 +66,15 @@ function Landing() {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/auth"><Button size="lg" className="h-12 px-6">Get started</Button></Link>
               <Link to="/auth"><Button size="lg" variant="outline" className="h-12 px-6">I'm a teacher</Button></Link>
+              {deferredPrompt && (
+                <Button size="lg" variant="secondary" className="h-12 px-6 gap-2" onClick={handleInstallClick}>
+                  <Download className="h-4 w-4" /> Download App
+                </Button>
+              )}
             </div>
+            {deferredPrompt && (
+              <p className="mt-2 text-xs text-muted-foreground">Or add it from your browser's share menu if using iOS.</p>
+            )}
             <p className="mt-4 text-xs text-muted-foreground">First person to sign up becomes the admin.</p>
           </div>
 
