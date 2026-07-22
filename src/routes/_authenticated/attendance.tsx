@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, orderBy, doc, writeBatch } from "firebase/firestore";
 import { useCurrentUser } from "@/lib/auth-hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,11 +35,17 @@ function AttendancePage() {
 
   const { data: classes = [] } = useQuery({
     queryKey: ["classes"],
-    queryFn: async () => (await supabase.from("classes").select("*").order("name")).data ?? [],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "classes"), orderBy("name")));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    },
   });
   const { data: batches = [] } = useQuery({
     queryKey: ["batches"],
-    queryFn: async () => (await supabase.from("batches").select("*").order("name")).data ?? [],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "batches"), orderBy("name")));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    },
   });
 
   useEffect(() => {
@@ -49,9 +56,12 @@ function AttendancePage() {
     queryKey: ["students-for-attendance", classId, batchId],
     queryFn: async () => {
       if (!classId) return [];
-      let q = supabase.from("students").select("*").eq("class_id", classId).order("roll_no");
-      if (batchId !== "all") q = q.eq("batch_id", batchId);
-      return (await q).data ?? [];
+      let qObj = query(collection(db, "students"), where("class_id", "==", classId), orderBy("roll_no"));
+      if (batchId !== "all") {
+        qObj = query(collection(db, "students"), where("class_id", "==", classId), where("batch_id", "==", batchId), orderBy("roll_no"));
+      }
+      const snap = await getDocs(qObj);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
     },
     enabled: !!classId,
   });
@@ -60,7 +70,9 @@ function AttendancePage() {
     queryKey: ["attendance-existing", classId, date],
     queryFn: async () => {
       if (!classId) return [];
-      return (await supabase.from("attendance").select("*").eq("class_id", classId).eq("date", date)).data ?? [];
+      const q = query(collection(db, "attendance"), where("class_id", "==", classId), where("date", "==", date));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
     },
     enabled: !!classId,
   });
@@ -91,16 +103,19 @@ function AttendancePage() {
 
   const save = useMutation({
     mutationFn: async () => {
-      const rows = students.map((s) => ({
-        student_id: s.id,
-        class_id: classId,
-        batch_id: s.batch_id,
-        date,
-        status: marks[s.id] ?? "absent",
-        marked_by: me!.user.id,
-      }));
-      const { error } = await supabase.from("attendance").upsert(rows, { onConflict: "student_id,date" });
-      if (error) throw error;
+      const batch = writeBatch(db);
+      students.forEach((s) => {
+        const ref = doc(db, "attendance", `${s.id}_${date}`);
+        batch.set(ref, {
+          student_id: s.id,
+          class_id: classId,
+          batch_id: s.batch_id,
+          date,
+          status: marks[s.id] ?? "absent",
+          marked_by: me!.user.id,
+        }, { merge: true });
+      });
+      await batch.commit();
     },
     onSuccess: () => {
       toast.success("Attendance saved");

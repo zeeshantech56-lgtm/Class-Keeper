@@ -1,6 +1,8 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UserCog, Info } from "lucide-react";
@@ -8,10 +10,17 @@ import { UserCog, Info } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/teachers")({
   ssr: false,
   beforeLoad: async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user: any = await new Promise((resolve) => {
+      const unsubscribe = onAuthStateChanged(auth, (u) => {
+        unsubscribe();
+        resolve(u);
+      });
+    });
     if (!user) throw redirect({ to: "/auth" });
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
-    const isAdmin = (roles ?? []).some((r) => r.role === "admin");
+    
+    const rolesSnap = await getDocs(query(collection(db, "user_roles"), where("user_id", "==", user.uid)));
+    const roles = rolesSnap.docs.map(d => d.data());
+    const isAdmin = roles.some((r) => r.role === "admin");
     if (!isAdmin) throw redirect({ to: "/dashboard" });
   },
   head: () => ({
@@ -29,24 +38,24 @@ function TeachersPage() {
   const { data } = useQuery({
     queryKey: ["teachers-overview"],
     queryFn: async () => {
-      const [rolesRes, profilesRes, assignRes, classesRes] = await Promise.all([
-        supabase.from("user_roles").select("*"),
-        supabase.from("profiles").select("*"),
-        supabase.from("teacher_assignments").select("*"),
-        supabase.from("classes").select("*"),
+      const [rolesSnap, profilesSnap, assignSnap, classesSnap] = await Promise.all([
+        getDocs(collection(db, "user_roles")),
+        getDocs(collection(db, "profiles")),
+        getDocs(collection(db, "teacher_assignments")),
+        getDocs(collection(db, "classes")),
       ]);
-      const roles = rolesRes.data ?? [];
-      const profiles = profilesRes.data ?? [];
-      const assign = assignRes.data ?? [];
-      const classes = classesRes.data ?? [];
+      const roles = rolesSnap.docs.map(d => d.data());
+      const profiles = profilesSnap.docs.map(d => d.data());
+      const assign = assignSnap.docs.map(d => d.data());
+      const classes = classesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       const teachers = roles.filter((r) => r.role === "teacher").map((r) => {
-        const p = profiles.find((x) => x.id === r.user_id);
-        const cls = assign.filter((a) => a.teacher_id === r.user_id).map((a) => classes.find((c) => c.id === a.class_id)?.name).filter(Boolean);
+        const p: any = profiles.find((x: any) => x.id === r.user_id);
+        const cls = assign.filter((a) => a.teacher_id === r.user_id).map((a) => classes.find((c: any) => c.id === a.class_id)?.name).filter(Boolean);
         return { id: r.user_id, name: p?.full_name || p?.email || "—", email: p?.email, classes: cls };
       });
       const admins = roles.filter((r) => r.role === "admin").map((r) => {
-        const p = profiles.find((x) => x.id === r.user_id);
+        const p: any = profiles.find((x: any) => x.id === r.user_id);
         return { id: r.user_id, name: p?.full_name || p?.email || "—", email: p?.email };
       });
       return { teachers, admins };

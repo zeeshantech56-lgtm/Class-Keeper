@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, orderBy, getDocs, doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,15 +61,24 @@ function StudentsPage() {
 
   const { data: classes = [] } = useQuery({
     queryKey: ["classes"],
-    queryFn: async () => (await supabase.from("classes").select("*").order("name")).data ?? [],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "classes"), orderBy("name")));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    }
   });
   const { data: batches = [] } = useQuery({
     queryKey: ["batches"],
-    queryFn: async () => (await supabase.from("batches").select("*").order("name")).data ?? [],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "batches"), orderBy("name")));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    }
   });
   const { data: students = [] } = useQuery({
     queryKey: ["students"],
-    queryFn: async () => (await supabase.from("students").select("*").order("name")).data ?? [],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "students"), orderBy("name")));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    }
   });
 
   const filtered = useMemo(() => {
@@ -92,11 +102,10 @@ function StudentsPage() {
         parent_email: parsed.data.parent_email || null,
       };
       if (editId) {
-        const { error } = await supabase.from("students").update(payload).eq("id", editId);
-        if (error) throw error;
+        await updateDoc(doc(db, "students", editId), payload);
       } else {
-        const { error } = await supabase.from("students").insert(payload);
-        if (error) throw error;
+        const docRef = doc(collection(db, "students"));
+        await setDoc(docRef, { id: docRef.id, ...payload });
       }
     },
     onSuccess: () => {
@@ -111,8 +120,7 @@ function StudentsPage() {
 
   const del = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("students").delete().eq("id", id);
-      if (error) throw error;
+      await deleteDoc(doc(db, "students", id));
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["students"] }); toast.success("Removed"); },
     onError: (e: Error) => toast.error(e.message),

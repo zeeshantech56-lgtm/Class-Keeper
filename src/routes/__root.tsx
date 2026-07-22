@@ -11,7 +11,8 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 function NotFoundComponent() {
   return (
@@ -105,6 +106,17 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: `
+          window.onerror = function(msg, url, lineNo, columnNo, error) {
+            fetch('http://localhost:8080/log-error?msg=' + encodeURIComponent(msg) + '&err=' + encodeURIComponent(error ? error.stack : ''));
+            console.error('GLOBAL ERROR:', msg, error);
+            return false;
+          };
+          window.addEventListener('unhandledrejection', function(event) {
+            fetch('http://localhost:8080/log-error?msg=' + encodeURIComponent(event.reason));
+            console.error('UNHANDLED PROMISE:', event.reason);
+          });
+        `}} />
         {children}
         <Scripts />
       </body>
@@ -117,12 +129,11 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       router.invalidate();
-      if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+      if (!user) queryClient.invalidateQueries();
     });
-    return () => sub.subscription.unsubscribe();
+    return () => unsubscribe();
   }, [router, queryClient]);
 
   return (

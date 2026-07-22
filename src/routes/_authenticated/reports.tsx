@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,28 +47,39 @@ function ReportsPage() {
 
   const { data: classes = [] } = useQuery({
     queryKey: ["classes"],
-    queryFn: async () => (await supabase.from("classes").select("*").order("name")).data ?? [],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "classes"), orderBy("name")));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    }
   });
   const { data: batches = [] } = useQuery({
     queryKey: ["batches"],
-    queryFn: async () => (await supabase.from("batches").select("*").order("name")).data ?? [],
+    queryFn: async () => {
+      const snap = await getDocs(query(collection(db, "batches"), orderBy("name")));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    }
   });
 
   const { data, isLoading } = useQuery({
     queryKey: ["report", from, to, classId, batchId],
     queryFn: async () => {
-      let sQ = supabase.from("students").select("*");
-      if (classId !== "all") sQ = sQ.eq("class_id", classId);
-      if (batchId !== "all") sQ = sQ.eq("batch_id", batchId);
-      const { data: studentsData } = await sQ;
-      const students = studentsData ?? [];
+      let sQ = query(collection(db, "students"));
+      if (classId !== "all") sQ = query(collection(db, "students"), where("class_id", "==", classId));
+      if (batchId !== "all") sQ = query(collection(db, "students"), where("class_id", "==", classId), where("batch_id", "==", batchId));
+      const sSnap = await getDocs(sQ);
+      const students = sSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
       const studentIds = students.map((s) => s.id);
 
-      let aQ = supabase.from("attendance").select("*").gte("date", from).lte("date", to);
-      if (studentIds.length > 0) aQ = aQ.in("student_id", studentIds);
-      const { data: attendance } = await aQ;
+      const aQ = query(collection(db, "attendance"), where("date", ">=", from), where("date", "<=", to));
+      const aSnap = await getDocs(aQ);
+      let attendance = aSnap.docs.map(d => d.data()) as any[];
+      
+      if (studentIds.length > 0) {
+        const idSet = new Set(studentIds);
+        attendance = attendance.filter(a => idSet.has(a.student_id));
+      }
 
-      return { students, attendance: attendance ?? [] };
+      return { students, attendance };
     },
   });
 

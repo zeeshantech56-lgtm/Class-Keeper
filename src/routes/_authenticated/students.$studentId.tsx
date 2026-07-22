@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, subMonths, addMonths } from "date-fns";
@@ -29,15 +30,31 @@ function StudentDetail() {
   const { data, isLoading } = useQuery({
     queryKey: ["student-detail", studentId],
     queryFn: async () => {
-      const [{ data: student }, { data: attendance }, { data: threshold }] = await Promise.all([
-        supabase.from("students").select("*, classes(name), batches(name)").eq("id", studentId).maybeSingle(),
-        supabase.from("attendance").select("*").eq("student_id", studentId).order("date", { ascending: false }),
-        supabase.from("app_settings").select("value").eq("key", "at_risk_threshold").maybeSingle(),
-      ]);
+      const studentSnap = await getDoc(doc(db, "students", studentId));
+      let student = studentSnap.exists() ? { id: studentSnap.id, ...studentSnap.data() } as any : null;
+      if (student) {
+        if (student.class_id) {
+           const classSnap = await getDoc(doc(db, "classes", student.class_id));
+           student.classes = classSnap.exists() ? { name: classSnap.data().name } : null;
+        }
+        if (student.batch_id) {
+           const batchSnap = await getDoc(doc(db, "batches", student.batch_id));
+           student.batches = batchSnap.exists() ? { name: batchSnap.data().name } : null;
+        }
+      }
+
+      const attQ = query(collection(db, "attendance"), where("student_id", "==", studentId));
+      const attSnap = await getDocs(attQ);
+      const attendance = attSnap.docs.map(d => d.data()).sort((a: any, b: any) => b.date.localeCompare(a.date));
+
+      const settingsQ = query(collection(db, "app_settings"), where("key", "==", "at_risk_threshold"));
+      const settingsSnap = await getDocs(settingsQ);
+      const threshold = settingsSnap.empty ? 75 : Number(settingsSnap.docs[0].data().value ?? 75);
+
       return {
         student,
-        attendance: attendance ?? [],
-        threshold: Number(threshold?.value ?? 75),
+        attendance,
+        threshold,
       };
     },
   });

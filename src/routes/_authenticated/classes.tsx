@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, deleteDoc, doc, query, where, orderBy } from "firebase/firestore";
 import { useCurrentUser } from "@/lib/auth-hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,38 +41,47 @@ function ClassesPage() {
   const { data: classes = [] } = useQuery({
     queryKey: ["classes"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("classes").select("*").order("name");
-      if (error) throw error;
-      return data ?? [];
+      const q = query(collection(db, "classes"), orderBy("name"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
     },
   });
 
   const { data: batches = [] } = useQuery({
     queryKey: ["batches"],
-    queryFn: async () => (await supabase.from("batches").select("*").order("name")).data ?? [],
+    queryFn: async () => {
+      const q = query(collection(db, "batches"), orderBy("name"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    },
   });
 
   const { data: teachers = [] } = useQuery({
     queryKey: ["teachers-with-roles"],
     queryFn: async () => {
-      const { data: roles } = await supabase.from("user_roles").select("user_id, role");
-      const teacherIds = (roles ?? []).filter((r) => r.role === "teacher").map((r) => r.user_id);
+      const rolesSnap = await getDocs(collection(db, "user_roles"));
+      const roles = rolesSnap.docs.map(d => d.data());
+      const teacherIds = roles.filter((r) => r.role === "teacher").map((r) => r.user_id);
       if (teacherIds.length === 0) return [];
-      const { data } = await supabase.from("profiles").select("*").in("id", teacherIds);
-      return data ?? [];
+      
+      const profilesSnap = await getDocs(collection(db, "profiles"));
+      const profiles = profilesSnap.docs.map(d => ({ id: d.id, ...d.data() }) as any);
+      return profiles.filter(p => teacherIds.includes(p.id));
     },
     enabled: isAdmin,
   });
 
   const { data: assignments = [] } = useQuery({
     queryKey: ["teacher-assignments"],
-    queryFn: async () => (await supabase.from("teacher_assignments").select("*")).data ?? [],
+    queryFn: async () => {
+      const snap = await getDocs(collection(db, "teacher_assignments"));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    },
   });
 
   const createClass = useMutation({
     mutationFn: async (name: string) => {
-      const { error } = await supabase.from("classes").insert({ name, created_by: me!.user.id });
-      if (error) throw error;
+      await addDoc(collection(db, "classes"), { name, created_by: me!.user.id });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["classes"] });
@@ -84,8 +94,7 @@ function ClassesPage() {
 
   const delClass = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("classes").delete().eq("id", id);
-      if (error) throw error;
+      await deleteDoc(doc(db, "classes", id));
     },
     onSuccess: () => {
       qc.invalidateQueries();
@@ -162,8 +171,7 @@ function ClassCard({ cls, batches, teachers, assignments, isAdmin, onDelete }: {
 
   const addBatch = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("batches").insert({ class_id: cls.id, name: newBatch });
-      if (error) throw error;
+      await addDoc(collection(db, "batches"), { class_id: cls.id, name: newBatch });
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["batches"] }); setNewBatch(""); toast.success("Batch added"); },
     onError: (e: Error) => toast.error(e.message),
@@ -171,8 +179,7 @@ function ClassCard({ cls, batches, teachers, assignments, isAdmin, onDelete }: {
 
   const delBatch = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("batches").delete().eq("id", id);
-      if (error) throw error;
+      await deleteDoc(doc(db, "batches", id));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["batches"] }),
   });
@@ -180,11 +187,13 @@ function ClassCard({ cls, batches, teachers, assignments, isAdmin, onDelete }: {
   const toggleTeacher = useMutation({
     mutationFn: async ({ teacherId, add }: { teacherId: string; add: boolean }) => {
       if (add) {
-        const { error } = await supabase.from("teacher_assignments").insert({ teacher_id: teacherId, class_id: cls.id });
-        if (error) throw error;
+        await addDoc(collection(db, "teacher_assignments"), { teacher_id: teacherId, class_id: cls.id });
       } else {
-        const { error } = await supabase.from("teacher_assignments").delete().eq("teacher_id", teacherId).eq("class_id", cls.id);
-        if (error) throw error;
+        const q = query(collection(db, "teacher_assignments"), where("teacher_id", "==", teacherId), where("class_id", "==", cls.id));
+        const snap = await getDocs(q);
+        for (const docSnap of snap.docs) {
+          await deleteDoc(docSnap.ref);
+        }
       }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["teacher-assignments"] }),

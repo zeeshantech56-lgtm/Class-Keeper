@@ -1,7 +1,8 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+import { auth, db } from "@/lib/firebase";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "firebase/auth";
+import { doc, setDoc, collection, query, limit, getDocs, addDoc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +14,13 @@ import { Loader2 } from "lucide-react";
 export const Route = createFileRoute("/auth")({
   ssr: false,
   beforeLoad: async () => {
-    const { data } = await supabase.auth.getUser();
-    if (data.user) throw redirect({ to: "/dashboard" });
+    const user = await new Promise((resolve) => {
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        unsubscribe();
+        resolve(user);
+      });
+    });
+    if (user) throw redirect({ to: "/dashboard" });
   },
   head: () => ({
     meta: [
@@ -37,41 +43,86 @@ function AuthPage() {
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Welcome back!");
-    navigate({ to: "/dashboard" });
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const user = cred.user;
+      
+      // Ensure profile exists
+      const profileSnap = await getDoc(doc(db, "profiles", user.uid));
+      if (!profileSnap.exists()) {
+        await setDoc(doc(db, "profiles", user.uid), {
+          id: user.uid,
+          full_name: email.split("@")[0],
+        });
+      }
+
+      // Check if any admins exist, if not make this user the admin
+      const q = query(collection(db, "user_roles"), limit(1));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        await addDoc(collection(db, "user_roles"), {
+          user_id: user.uid,
+          role: "admin"
+        });
+      }
+
+      toast.success("Welcome back!");
+      navigate({ to: "/dashboard" });
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: { full_name: fullName },
-      },
-    });
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Account created. You can sign in now.");
+    try {
+      const { user } = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Create user profile in Firestore
+      await setDoc(doc(db, "profiles", user.uid), {
+        id: user.uid,
+        full_name: fullName,
+      });
+
+      // Check if any admins exist, if not make this user the admin
+      const q = query(collection(db, "user_roles"), limit(1));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        await addDoc(collection(db, "user_roles"), {
+          user_id: user.uid,
+          role: "admin"
+        });
+      }
+
+      toast.success("Account created. You can sign in now.");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleGoogle() {
     setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
+    try {
+      const provider = new GoogleAuthProvider();
+      const { user } = await signInWithPopup(auth, provider);
+      
+      // Optionally check if profile exists, if not create one
+      await setDoc(doc(db, "profiles", user.uid), {
+        id: user.uid,
+        full_name: user.displayName,
+      }, { merge: true });
+
+      navigate({ to: "/dashboard" });
+    } catch (error: any) {
+      toast.error("Google sign-in failed: " + error.message);
+    } finally {
       setLoading(false);
-      toast.error("Google sign-in failed");
-      return;
     }
-    if (result.redirected) return;
-    navigate({ to: "/dashboard" });
   }
 
   return (

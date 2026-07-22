@@ -10,7 +10,7 @@ import {
   LogOut,
   Menu,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { auth } from "@/lib/firebase";
 import { useCurrentUser } from "@/lib/auth-hooks";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   async function handleSignOut() {
     await queryClient.cancelQueries();
     queryClient.clear();
-    await supabase.auth.signOut();
+    await auth.signOut();
     navigate({ to: "/auth", replace: true });
   }
 

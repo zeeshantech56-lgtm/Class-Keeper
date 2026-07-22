@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { useCurrentUser } from "@/lib/auth-hooks";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,21 +38,21 @@ function Dashboard() {
       const monthStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
       const from30 = format(subDays(new Date(), 29), "yyyy-MM-dd");
 
-      const [studentsRes, classesRes, todayRes, yesterdayRes, monthRes, thresholdRes] = await Promise.all([
-        supabase.from("students").select("id, class_id, batch_id, name, roll_no"),
-        supabase.from("classes").select("id, name"),
-        supabase.from("attendance").select("student_id, class_id, status").eq("date", today),
-        supabase.from("attendance").select("status").eq("date", yesterday),
-        supabase.from("attendance").select("date, status, class_id, student_id").gte("date", from30).lte("date", today),
-        supabase.from("app_settings").select("value").eq("key", "at_risk_threshold").maybeSingle(),
+      const [studentsSnap, classesSnap, todaySnap, yesterdaySnap, monthSnap, settingsSnap] = await Promise.all([
+        getDocs(collection(db, "students")),
+        getDocs(collection(db, "classes")),
+        getDocs(query(collection(db, "attendance"), where("date", "==", today))),
+        getDocs(query(collection(db, "attendance"), where("date", "==", yesterday))),
+        getDocs(query(collection(db, "attendance"), where("date", ">=", from30), where("date", "<=", today))),
+        getDocs(query(collection(db, "app_settings"), where("key", "==", "at_risk_threshold"))),
       ]);
 
-      const students = studentsRes.data ?? [];
-      const classes = classesRes.data ?? [];
-      const todayA = todayRes.data ?? [];
-      const yA = yesterdayRes.data ?? [];
-      const monthA = monthRes.data ?? [];
-      const threshold = Number(thresholdRes.data?.value ?? 75);
+      const students = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      const classes = classesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      const todayA = todaySnap.docs.map(d => d.data());
+      const yA = yesterdaySnap.docs.map(d => d.data());
+      const monthA = monthSnap.docs.map(d => d.data());
+      const threshold = settingsSnap.empty ? 75 : Number(settingsSnap.docs[0].data().value ?? 75);
 
       const presentToday = todayA.filter((r) => r.status === "present").length;
       const absentToday = todayA.filter((r) => r.status === "absent").length;
