@@ -66,7 +66,7 @@ function TeachersPage() {
       const teachers = roles.filter((r) => r.role === "teacher").map((r) => {
         const p: any = profiles.find((x: any) => x.id === r.user_id);
         const cls = assign.filter((a) => a.teacher_id === r.user_id).map((a) => classes.find((c: any) => c.id === a.class_id)?.name).filter(Boolean);
-        return { id: r.user_id, name: p?.full_name || p?.email || "—", email: p?.email, classes: cls, classIds: assign.filter((a) => a.teacher_id === r.user_id).map((a) => a.class_id) };
+        return { id: r.user_id, name: p?.full_name || p?.email || "—", email: p?.email, classes: cls, assignments: assign.filter((a) => a.teacher_id === r.user_id).map((a) => ({ class_id: a.class_id, batch_id: a.batch_id })) };
       });
       const admins = roles.filter((r) => r.role === "admin").map((r) => {
         const p: any = profiles.find((x: any) => x.id === r.user_id);
@@ -84,7 +84,7 @@ function TeachersPage() {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [editOpen, setEditOpen] = useState(false);
   const [editTeacherId, setEditTeacherId] = useState<string | null>(null);
-  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [selectedAssignments, setSelectedAssignments] = useState<{class_id: string, batch_id?: string}[]>([]);
 
   const createTeacher = useMutation({
     mutationFn: async () => {
@@ -144,8 +144,10 @@ function TeachersPage() {
       for (const d of snap.docs) {
         await deleteDoc(d.ref);
       }
-      for (const cid of selectedClasses) {
-        await addDoc(collection(db, "teacher_assignments"), { teacher_id: editTeacherId, class_id: cid });
+      for (const a of selectedAssignments) {
+        const payload: any = { teacher_id: editTeacherId, class_id: a.class_id };
+        if (a.batch_id) payload.batch_id = a.batch_id;
+        await addDoc(collection(db, "teacher_assignments"), payload);
       }
     },
     onSuccess: () => {
@@ -195,31 +197,55 @@ function TeachersPage() {
         )}
 
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Edit assigned classes</DialogTitle></DialogHeader>
-            <div className="space-y-2 py-2">
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Edit assigned classes & batches</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
               {data?.allClasses?.map(c => {
                 const classBatches = data?.allBatches?.filter((b: any) => b.class_id === c.id) || [];
+                const isAllAssigned = selectedAssignments.some(a => a.class_id === c.id && !a.batch_id);
                 return (
-                  <label key={c.id} className="flex items-start gap-3 rounded border p-3 cursor-pointer hover:bg-accent">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4 rounded border-gray-300"
-                      checked={selectedClasses.includes(c.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) setSelectedClasses([...selectedClasses, c.id]);
-                        else setSelectedClasses(selectedClasses.filter(id => id !== c.id));
-                      }}
-                    />
-                    <div>
-                      <div className="font-medium">{c.name}</div>
-                      {classBatches.length > 0 && (
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          Batches: {classBatches.map((b: any) => b.name).join(", ")}
-                        </div>
-                      )}
-                    </div>
-                  </label>
+                  <div key={c.id} className="rounded border p-3">
+                    <label className="flex items-start gap-2 cursor-pointer font-medium mb-2">
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 rounded border-gray-300"
+                        checked={isAllAssigned}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedAssignments([...selectedAssignments.filter(a => a.class_id !== c.id), { class_id: c.id }]);
+                          } else {
+                            setSelectedAssignments(selectedAssignments.filter(a => !(a.class_id === c.id && !a.batch_id)));
+                          }
+                        }}
+                      />
+                      <span>{c.name} (All batches)</span>
+                    </label>
+                    {classBatches.length > 0 && (
+                      <div className="ml-6 space-y-2 border-l pl-4">
+                        {classBatches.map((b: any) => {
+                          const isBatchAssigned = selectedAssignments.some(a => a.class_id === c.id && a.batch_id === b.id);
+                          return (
+                            <label key={b.id} className="flex items-center gap-2 cursor-pointer text-sm">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-gray-300"
+                                disabled={isAllAssigned}
+                                checked={isBatchAssigned || isAllAssigned}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedAssignments([...selectedAssignments, { class_id: c.id, batch_id: b.id }]);
+                                  } else {
+                                    setSelectedAssignments(selectedAssignments.filter(a => !(a.class_id === c.id && a.batch_id === b.id)));
+                                  }
+                                }}
+                              />
+                              <span className={isAllAssigned ? "text-muted-foreground" : ""}>{b.name}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
               {data?.allClasses?.length === 0 && <p className="text-sm text-muted-foreground">No classes exist yet.</p>}
@@ -269,7 +295,7 @@ function TeachersPage() {
                           <>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => {
                               setEditTeacherId(t.id);
-                              setSelectedClasses(t.classIds);
+                              setSelectedAssignments(t.assignments);
                               setEditOpen(true);
                             }}>
                               <Edit2 className="h-4 w-4" />

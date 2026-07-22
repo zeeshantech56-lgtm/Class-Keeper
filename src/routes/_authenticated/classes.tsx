@@ -161,13 +161,15 @@ function ClassCard({ cls, batches, teachers, assignments, isAdmin, onDelete }: {
   cls: { id: string; name: string };
   batches: { id: string; name: string; class_id: string }[];
   teachers: { id: string; full_name: string | null; email: string | null }[];
-  assignments: { teacher_id: string; class_id: string }[];
+  assignments: { id: string; teacher_id: string; class_id: string; batch_id?: string }[];
   isAdmin: boolean;
   onDelete: () => void;
 }) {
   const qc = useQueryClient();
   const [newBatch, setNewBatch] = useState("");
   const [selTeacher, setSelTeacher] = useState("");
+
+  const [selBatch, setSelBatch] = useState("all");
 
   const addBatch = useMutation({
     mutationFn: async () => {
@@ -184,17 +186,23 @@ function ClassCard({ cls, batches, teachers, assignments, isAdmin, onDelete }: {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["batches"] }),
   });
 
-  const toggleTeacher = useMutation({
-    mutationFn: async ({ teacherId, add }: { teacherId: string; add: boolean }) => {
-      if (add) {
-        await addDoc(collection(db, "teacher_assignments"), { teacher_id: teacherId, class_id: cls.id });
-      } else {
-        const q = query(collection(db, "teacher_assignments"), where("teacher_id", "==", teacherId), where("class_id", "==", cls.id));
-        const snap = await getDocs(q);
-        for (const docSnap of snap.docs) {
-          await deleteDoc(docSnap.ref);
-        }
-      }
+  const assignTeacher = useMutation({
+    mutationFn: async ({ teacherId, batchId }: { teacherId: string; batchId: string }) => {
+      const payload: any = { teacher_id: teacherId, class_id: cls.id };
+      if (batchId !== "all") payload.batch_id = batchId;
+      await addDoc(collection(db, "teacher_assignments"), payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["teacher-assignments"] });
+      setSelTeacher("");
+      setSelBatch("all");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeAssignment = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      await deleteDoc(doc(db, "teacher_assignments", assignmentId));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["teacher-assignments"] }),
     onError: (e: Error) => toast.error(e.message),
@@ -245,10 +253,11 @@ function ClassCard({ cls, batches, teachers, assignments, isAdmin, onDelete }: {
               <ul className="space-y-1">
                 {assignments.map((a) => {
                   const t = teachers.find((x) => x.id === a.teacher_id);
+                  const b = batches.find((x) => x.id === a.batch_id);
                   return (
-                    <li key={a.teacher_id} className="flex items-center justify-between rounded border bg-background px-3 py-1.5 text-sm">
-                      <span>{t?.full_name || t?.email || "Unknown"}</span>
-                      <Button variant="ghost" size="sm" onClick={() => toggleTeacher.mutate({ teacherId: a.teacher_id, add: false })}>
+                    <li key={a.id} className="flex items-center justify-between rounded border bg-background px-3 py-1.5 text-sm">
+                      <span>{t?.full_name || t?.email || "Unknown"} <span className="text-muted-foreground">{b ? `(${b.name})` : "(All batches)"}</span></span>
+                      <Button variant="ghost" size="sm" onClick={() => removeAssignment.mutate(a.id)}>
                         Remove
                       </Button>
                     </li>
@@ -256,17 +265,28 @@ function ClassCard({ cls, batches, teachers, assignments, isAdmin, onDelete }: {
                 })}
               </ul>
             )}
-            {availableTeachers.length > 0 && (
+            {teachers.length > 0 && (
               <div className="mt-2 flex gap-2">
                 <Select value={selTeacher} onValueChange={setSelTeacher}>
-                  <SelectTrigger><SelectValue placeholder="Assign teacher" /></SelectTrigger>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="Assign teacher" /></SelectTrigger>
                   <SelectContent>
-                    {availableTeachers.map((t) => (
+                    {teachers.map((t) => (
                       <SelectItem key={t.id} value={t.id}>{t.full_name || t.email}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button size="sm" onClick={() => { if (selTeacher) { toggleTeacher.mutate({ teacherId: selTeacher, add: true }); setSelTeacher(""); } }}>Assign</Button>
+                {batches.length > 0 && (
+                  <Select value={selBatch} onValueChange={setSelBatch}>
+                    <SelectTrigger className="w-[130px]"><SelectValue placeholder="All batches" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All batches</SelectItem>
+                      {batches.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Button size="sm" onClick={() => { if (selTeacher) assignTeacher.mutate({ teacherId: selTeacher, batchId: selBatch }); }}>Assign</Button>
               </div>
             )}
           </div>
