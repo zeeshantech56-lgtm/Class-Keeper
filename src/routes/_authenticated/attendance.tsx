@@ -56,12 +56,13 @@ function AttendancePage() {
     queryKey: ["students-for-attendance", classId, batchId],
     queryFn: async () => {
       if (!classId) return [];
-      let qObj = query(collection(db, "students"), where("class_id", "==", classId), orderBy("roll_no"));
+      let qObj = query(collection(db, "students"), where("class_id", "==", classId));
       if (batchId !== "all") {
-        qObj = query(collection(db, "students"), where("class_id", "==", classId), where("batch_id", "==", batchId), orderBy("roll_no"));
+        qObj = query(collection(db, "students"), where("class_id", "==", classId), where("batch_id", "==", batchId));
       }
       const snap = await getDocs(qObj);
-      return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      return docs.sort((a, b) => (a.roll_no || "").localeCompare(b.roll_no || ""));
     },
     enabled: !!classId,
   });
