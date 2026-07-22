@@ -35,8 +35,8 @@ export const Route = createFileRoute("/_authenticated/students")({
 const studentSchema = z.object({
   name: z.string().trim().min(1).max(100),
   roll_no: z.string().trim().min(1).max(30),
-  class_id: z.string().uuid(),
-  batch_id: z.string().uuid().nullable(),
+  class_id: z.string().min(1),
+  batch_id: z.string().min(1).nullable(),
   email: z.string().trim().email().max(255).optional().or(z.literal("")),
   phone: z.string().trim().max(30).optional().or(z.literal("")),
   parent_name: z.string().trim().max(100).optional().or(z.literal("")),
