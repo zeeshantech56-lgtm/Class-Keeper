@@ -74,7 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Desktop sidebar */}
         <aside className="hidden w-64 shrink-0 border-r bg-sidebar md:block">
           <div className="flex h-16 items-center gap-2 border-b px-5">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground font-bold">A</div>
+            <img src="/logo.png" alt="Attendly Logo" className="h-8 w-8 object-contain" />
             <span className="font-display text-lg font-semibold">Attendly</span>
           </div>
           <NavList isAdmin={isAdmin} />
@@ -96,7 +96,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Mobile top bar */}
           <header className="flex h-14 items-center justify-between border-b px-4 md:hidden">
             <div className="flex items-center gap-2">
-              <div className="grid h-7 w-7 place-items-center rounded-md bg-primary text-primary-foreground text-xs font-bold">A</div>
+              <img src="/logo.png" alt="Attendly Logo" className="h-7 w-7 object-contain" />
               <span className="font-display font-semibold">Attendly</span>
             </div>
             <Sheet>
@@ -105,7 +105,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </SheetTrigger>
               <SheetContent side="left" className="w-64 p-0">
                 <div className="flex h-16 items-center gap-2 border-b px-5">
-                  <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground font-bold">A</div>
+                  <img src="/logo.png" alt="Attendly Logo" className="h-8 w-8 object-contain" />
                   <span className="font-display text-lg font-semibold">Attendly</span>
                 </div>
                 <NavList isAdmin={isAdmin} />
