@@ -134,6 +134,26 @@ function TeachersPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const saveAssignments = useMutation({
+    mutationFn: async () => {
+      if (!editTeacherId) return;
+      const q = query(collection(db, "teacher_assignments"), where("teacher_id", "==", editTeacherId));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        await deleteDoc(d.ref);
+      }
+      for (const cid of selectedClasses) {
+        await addDoc(collection(db, "teacher_assignments"), { teacher_id: editTeacherId, class_id: cid });
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["teachers-overview"] });
+      setEditOpen(false);
+      toast.success("Teacher classes updated!");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
