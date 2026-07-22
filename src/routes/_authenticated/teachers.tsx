@@ -50,16 +50,18 @@ function TeachersPage() {
   const { data } = useQuery({
     queryKey: ["teachers-overview"],
     queryFn: async () => {
-      const [rolesSnap, profilesSnap, assignSnap, classesSnap] = await Promise.all([
+      const [rolesSnap, profilesSnap, assignSnap, classesSnap, batchesSnap] = await Promise.all([
         getDocs(collection(db, "user_roles")),
         getDocs(collection(db, "profiles")),
         getDocs(collection(db, "teacher_assignments")),
         getDocs(collection(db, "classes")),
+        getDocs(collection(db, "batches")),
       ]);
       const roles = rolesSnap.docs.map(d => d.data());
       const profiles = profilesSnap.docs.map(d => d.data());
       const assign = assignSnap.docs.map(d => d.data());
       const classes = classesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const batches = batchesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       const teachers = roles.filter((r) => r.role === "teacher").map((r) => {
         const p: any = profiles.find((x: any) => x.id === r.user_id);
@@ -70,7 +72,7 @@ function TeachersPage() {
         const p: any = profiles.find((x: any) => x.id === r.user_id);
         return { id: r.user_id, name: p?.full_name || p?.email || "—", email: p?.email };
       });
-      return { teachers, admins, allClasses: classes };
+      return { teachers, admins, allClasses: classes, allBatches: batches };
     },
   });
 
@@ -196,20 +198,30 @@ function TeachersPage() {
           <DialogContent>
             <DialogHeader><DialogTitle>Edit assigned classes</DialogTitle></DialogHeader>
             <div className="space-y-2 py-2">
-              {data?.allClasses?.map(c => (
-                <label key={c.id} className="flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300"
-                    checked={selectedClasses.includes(c.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) setSelectedClasses([...selectedClasses, c.id]);
-                      else setSelectedClasses(selectedClasses.filter(id => id !== c.id));
-                    }}
-                  />
-                  <span>{c.name}</span>
-                </label>
-              ))}
+              {data?.allClasses?.map(c => {
+                const classBatches = data?.allBatches?.filter((b: any) => b.class_id === c.id) || [];
+                return (
+                  <label key={c.id} className="flex items-start gap-3 rounded border p-3 cursor-pointer hover:bg-accent">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded border-gray-300"
+                      checked={selectedClasses.includes(c.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedClasses([...selectedClasses, c.id]);
+                        else setSelectedClasses(selectedClasses.filter(id => id !== c.id));
+                      }}
+                    />
+                    <div>
+                      <div className="font-medium">{c.name}</div>
+                      {classBatches.length > 0 && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Batches: {classBatches.map((b: any) => b.name).join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
               {data?.allClasses?.length === 0 && <p className="text-sm text-muted-foreground">No classes exist yet.</p>}
             </div>
             <DialogFooter>
