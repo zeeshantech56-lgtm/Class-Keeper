@@ -16,7 +16,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Edit2 } from "lucide-react";
+import { useCurrentUser } from "@/lib/auth-hooks";
 
 export const Route = createFileRoute("/_authenticated/teachers")({
   ssr: false,
@@ -63,19 +64,25 @@ function TeachersPage() {
       const teachers = roles.filter((r) => r.role === "teacher").map((r) => {
         const p: any = profiles.find((x: any) => x.id === r.user_id);
         const cls = assign.filter((a) => a.teacher_id === r.user_id).map((a) => classes.find((c: any) => c.id === a.class_id)?.name).filter(Boolean);
-        return { id: r.user_id, name: p?.full_name || p?.email || "—", email: p?.email, classes: cls };
+        return { id: r.user_id, name: p?.full_name || p?.email || "—", email: p?.email, classes: cls, classIds: assign.filter((a) => a.teacher_id === r.user_id).map((a) => a.class_id) };
       });
       const admins = roles.filter((r) => r.role === "admin").map((r) => {
         const p: any = profiles.find((x: any) => x.id === r.user_id);
         return { id: r.user_id, name: p?.full_name || p?.email || "—", email: p?.email };
       });
-      return { teachers, admins };
+      return { teachers, admins, allClasses: classes };
     },
   });
+
+  const { data: me } = useCurrentUser();
+  const isSuperAdmin = me?.isSuperAdmin ?? false;
 
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTeacherId, setEditTeacherId] = useState<string | null>(null);
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
 
   const createTeacher = useMutation({
     mutationFn: async () => {
@@ -134,31 +141,59 @@ function TeachersPage() {
           <h1 className="font-display text-3xl font-semibold">Teachers & admins</h1>
           <p className="text-muted-foreground">Everyone who has access to Attendly.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" /> Add teacher</Button>
-          </DialogTrigger>
+        {isSuperAdmin && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="mr-2 h-4 w-4" /> Add teacher</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Create teacher account</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label>Full name</Label>
+                  <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Email</Label>
+                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Password</Label>
+                  <Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+                  <p className="text-xs text-muted-foreground mt-1">They can log in with this password.</p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => createTeacher.mutate()} disabled={!form.email || !form.password || createTeacher.isPending}>
+                  Create account
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Create teacher account</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label>Full name</Label>
-                <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-              </div>
-              <div className="space-y-1">
-                <Label>Email</Label>
-                <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-              </div>
-              <div className="space-y-1">
-                <Label>Password</Label>
-                <Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
-                <p className="text-xs text-muted-foreground mt-1">They can log in with this password.</p>
-              </div>
+            <DialogHeader><DialogTitle>Edit assigned classes</DialogTitle></DialogHeader>
+            <div className="space-y-2 py-2">
+              {data?.allClasses?.map(c => (
+                <label key={c.id} className="flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300"
+                    checked={selectedClasses.includes(c.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedClasses([...selectedClasses, c.id]);
+                      else setSelectedClasses(selectedClasses.filter(id => id !== c.id));
+                    }}
+                  />
+                  <span>{c.name}</span>
+                </label>
+              ))}
+              {data?.allClasses?.length === 0 && <p className="text-sm text-muted-foreground">No classes exist yet.</p>}
             </div>
             <DialogFooter>
-              <Button onClick={() => createTeacher.mutate()} disabled={!form.email || !form.password || createTeacher.isPending}>
-                Create account
-              </Button>
+              <Button onClick={() => saveAssignments.mutate()} disabled={saveAssignments.isPending}>Save changes</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -198,9 +233,20 @@ function TeachersPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium">{t.classes.length} class{t.classes.length === 1 ? "" : "es"}</span>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeTeacher.mutate(t.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {isSuperAdmin && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => {
+                              setEditTeacherId(t.id);
+                              setSelectedClasses(t.classIds);
+                              setEditOpen(true);
+                            }}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeTeacher.mutate(t.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                     {t.classes.length > 0 && (

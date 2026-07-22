@@ -33,6 +33,7 @@ export function useCurrentUser() {
         profile,
         roles: roleList,
         isAdmin: roleList.includes("admin") || roleList.includes("teacher"),
+        isSuperAdmin: roleList.includes("admin"),
         isTeacher: roleList.includes("teacher"),
       };
     },
