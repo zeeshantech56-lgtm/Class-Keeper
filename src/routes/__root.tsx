@@ -3,8 +3,6 @@ import {
   Outlet,
   createRootRouteWithContext,
   useRouter,
-  HeadContent,
-  Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -72,56 +70,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Attendly — Smart Attendance for Schools" },
-      { name: "description", content: "Take attendance, manage classes and batches, assign teachers, and track student presence with a real-time dashboard." },
-      { name: "author", content: "Attendly" },
-      { property: "og:title", content: "Attendly — Smart Attendance for Schools" },
-      { property: "og:description", content: "Take attendance, manage classes and batches, and see the full picture with a real-time dashboard." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" },
-    ],
-  }),
-  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
-
-function RootShell({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <script dangerouslySetInnerHTML={{ __html: `
-          window.onerror = function(msg, url, lineNo, columnNo, error) {
-            fetch('http://localhost:8080/log-error?msg=' + encodeURIComponent(msg) + '&err=' + encodeURIComponent(error ? error.stack : ''));
-            console.error('GLOBAL ERROR:', msg, error);
-            return false;
-          };
-          window.addEventListener('unhandledrejection', function(event) {
-            fetch('http://localhost:8080/log-error?msg=' + encodeURIComponent(event.reason));
-            console.error('UNHANDLED PROMISE:', event.reason);
-          });
-        `}} />
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
