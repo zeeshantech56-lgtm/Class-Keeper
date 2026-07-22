@@ -81,7 +81,7 @@ function ClassesPage() {
 
   const createClass = useMutation({
     mutationFn: async (name: string) => {
-      await addDoc(collection(db, "classes"), { name, created_by: me!.user.id });
+      await addDoc(collection(db, "classes"), { name, created_by: me!.user.uid });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["classes"] });

@@ -112,7 +112,7 @@ function AttendancePage() {
           batch_id: s.batch_id,
           date,
           status: marks[s.id] ?? "absent",
-          marked_by: me!.user.id,
+          marked_by: me!.user.uid,
         }, { merge: true });
       });
       await batch.commit();
