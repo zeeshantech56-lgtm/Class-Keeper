@@ -10,12 +10,13 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, addDoc } from "firebase/firestore";
+import { doc, setDoc, addDoc, deleteDoc } from "firebase/firestore";
 import { firebaseConfig } from "@/lib/firebase";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/teachers")({
   ssr: false,
@@ -106,6 +107,26 @@ function TeachersPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const removeTeacher = useMutation({
+    mutationFn: async (teacherId: string) => {
+      // Remove roles
+      const rolesSnap = await getDocs(query(collection(db, "user_roles"), where("user_id", "==", teacherId)));
+      for (const d of rolesSnap.docs) {
+        await deleteDoc(d.ref);
+      }
+      // Remove assignments
+      const assignSnap = await getDocs(query(collection(db, "teacher_assignments"), where("teacher_id", "==", teacherId)));
+      for (const d of assignSnap.docs) {
+        await deleteDoc(d.ref);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["teachers-overview"] });
+      toast.success("Teacher access revoked!");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -175,7 +196,12 @@ function TeachersPage() {
                         <div className="font-medium">{t.name}</div>
                         <div className="text-xs text-muted-foreground">{t.email}</div>
                       </div>
-                      <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium">{t.classes.length} class{t.classes.length === 1 ? "" : "es"}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium">{t.classes.length} class{t.classes.length === 1 ? "" : "es"}</span>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeTeacher.mutate(t.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     {t.classes.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1 text-xs">
