@@ -4,6 +4,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Users, BarChart3, Calendar, ShieldCheck, Download } from "lucide-react";
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -33,11 +34,16 @@ function Landing() {
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      setDeferredPrompt(null);
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") {
+        setDeferredPrompt(null);
+      }
+    } else {
+      toast.info("Installation", {
+        description: "On iOS, tap Share and 'Add to Home Screen'. On desktop, look for the install icon in your browser's address bar.",
+      });
     }
   };
 
@@ -66,15 +72,11 @@ function Landing() {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/auth"><Button size="lg" className="h-12 px-6">Get started</Button></Link>
               <Link to="/auth"><Button size="lg" variant="outline" className="h-12 px-6">I'm a teacher</Button></Link>
-              {deferredPrompt && (
-                <Button size="lg" variant="secondary" className="h-12 px-6 gap-2" onClick={handleInstallClick}>
-                  <Download className="h-4 w-4" /> Download App
-                </Button>
-              )}
+              <Button size="lg" variant="secondary" className="h-12 px-6 gap-2" onClick={handleInstallClick}>
+                <Download className="h-4 w-4" /> Download App
+              </Button>
             </div>
-            {deferredPrompt && (
-              <p className="mt-2 text-xs text-muted-foreground">Or add it from your browser's share menu if using iOS.</p>
-            )}
+            <p className="mt-2 text-xs text-muted-foreground">If using iOS, you can also add it from your browser's share menu.</p>
             <p className="mt-4 text-xs text-muted-foreground">First person to sign up becomes the admin.</p>
           </div>
 
