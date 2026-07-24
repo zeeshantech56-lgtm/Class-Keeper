@@ -4,7 +4,6 @@ import { onAuthStateChanged } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Users, BarChart3, Calendar, ShieldCheck, Download } from "lucide-react";
 import { useState, useEffect } from "react";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -40,10 +39,6 @@ function Landing() {
       if (outcome === "accepted") {
         setDeferredPrompt(null);
       }
-    } else {
-      toast.info("Installation", {
-        description: "On iOS, tap Share and 'Add to Home Screen'. On desktop, look for the install icon in your browser's address bar.",
-      });
     }
   };
 
