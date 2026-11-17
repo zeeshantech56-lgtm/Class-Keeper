@@ -118,15 +118,14 @@ async function seed() {
   const profiles = profilesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
   
   if (profiles.length > 0) {
-    // Assign some teachers to our new classes
     const tAssignments = [
-      { user_id: profiles[0].id, class_id: "class_10_sci", batch_id: "batch_10_sci_a" },
-      { user_id: profiles[0].id, class_id: "class_10_math", batch_id: "batch_10_math_a" },
-      { user_id: profiles[1]?.id || profiles[0].id, class_id: "class_11_cs", batch_id: "batch_11_cs_a" },
-      { user_id: profiles[2]?.id || profiles[0].id, class_id: "class_12_comm", batch_id: "batch_12_comm_a" },
+      { teacher_id: profiles[0].id, class_id: "class_10_sci", batch_id: "batch_10_sci_a" },
+      { teacher_id: profiles[0].id, class_id: "class_10_math", batch_id: "batch_10_math_a" },
+      { teacher_id: profiles[1]?.id || profiles[0].id, class_id: "class_11_cs", batch_id: "batch_11_cs_a" },
+      { teacher_id: profiles[2]?.id || profiles[0].id, class_id: "class_12_comm", batch_id: "batch_12_comm_a" },
     ];
     for (const a of tAssignments) {
-      await setDoc(doc(db, "teacher_assignments", `${a.user_id}_${a.class_id}`), a, { merge: true });
+      await setDoc(doc(db, "teacher_assignments", `${a.teacher_id}_${a.class_id}`), a, { merge: true });
     }
   }
 
