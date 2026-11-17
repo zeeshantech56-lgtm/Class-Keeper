@@ -138,6 +138,21 @@ function AuthPage() {
     }
   }
 
+  async function handleDemoSignIn() {
+    setEmail("demo@attendly.com");
+    setPassword("AttendlyDemo2026!");
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, "demo@attendly.com", "AttendlyDemo2026!");
+      toast.success("Welcome! Signed in with sample demo data.");
+      navigate({ to: "/dashboard" });
+    } catch (error: any) {
+      toast.error("Demo login error: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto grid min-h-screen max-w-6xl grid-cols-1 md:grid-cols-2">
@@ -216,6 +231,21 @@ function AuthPage() {
               <Button variant="outline" className="w-full" onClick={handleGoogle} disabled={loading}>
                 Continue with Google
               </Button>
+
+              <div className="mt-5 border-t pt-4">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full font-medium shadow-sm transition-all hover:brightness-105"
+                  onClick={handleDemoSignIn}
+                  disabled={loading}
+                >
+                  ⚡ Explore with Demo Data (Instant Login)
+                </Button>
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                  Login directly with preloaded classes, students & 30-day analytics.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
